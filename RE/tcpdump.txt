@@ -1,0 +1,12 @@
+Date: 12 December 2020
+
+Network Traffic Analysis:
+sudo tcpdump -i lo 'port 9999' -w captured.pcap
+	-i : interface, lo => loopback address
+	'port 9999' : filter
+	-w : write to
+	
+sudo tcpdump -X -r captured.pcap > captured.log
+	-X : shows the packet data in hexadecimal and ASCII
+	-r : read from PCAP file
+

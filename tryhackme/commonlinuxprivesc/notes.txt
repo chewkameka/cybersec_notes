@@ -1,0 +1,119 @@
+Tuesday 26 January 2021 12:26:36 PM 
+
+url: https://tryhackme.com/room/commonlinuxprivesc
+
+Types of privesc:
+	Horizontal: From user 1 to user 2
+	Vertical: From user 1 to admin
+	
+Using LinEnum
+
+SUID: Set owner User ID up in execution. Run file with the permissions of the owner of that file.
+
+Crontab Contents: Scheduled cron jobs. Cron is used to schedule command at a specific time. These scheduled commands or tasks are knows as cron jobs.
+
+# "cat /etc/shells" to see the different types of shells available.
+
+Commands to list cron jobs for current user:
+	crontab -l
+	cat /etc/crontab
+
+EXPLOITING THE SUID/ GUID BIT:
+
+Linux has 3 modes of operation: read, write and execute
+user     group     others
+
+    rwx       rwx       rwx
+
+    421       421       421
+    
+ so a permission like 653 means the user can read and write, the group can read and execute, while others can write and execute.
+ 
+ SUID (Set user id on execute): rws-rwx-rwx
+ SGID (Set group id on execute): rwx-rws-rwx
+ 
+ Finding SUID Binaries: We already know that there is SUID capable files on the system, thanks to our LinEnum scan. However, if we want to do this manually we can use the command: "find / -perm -u=s -type f 2>/dev/null" to search the file system for SUID/GUID files. Let's break down this command.
+
+find - Initiates the "find" command
+
+/ - Searches the whole file system
+
+-perm - searches for files with specific permissions
+
+-u=s - Any of the permission bits mode are set for the file. Symbolic modes are accepted in this form
+
+-type f - Only search for files
+
+2>/dev/null - Suppresses errors
+
+
+Exploiting PASSWD file:
+/etc/passwd contains system account info.
+
+    test:x:0:0:root:/root:/bin/bash
+
+test - username
+x - to represent hashed password stored in /etc/shadow. in place of x u can also write the hash.
+0 - User id UID (0 = root), 1-99 for predefined accounts, 100-999 for administrative and sys accounts and groups
+0 - Group id GID, primary group stored in /etc/group
+User id info - comment field to add extra info about user such as full name phone number. Used by finger command.
+Home directory - absolute path to directory the user will be in when they login. if it doesnt exist then default is /.
+command/shell - absolute path of a command or shell (/bin/bash), usually a shell but not always.
+
+# openssl passwd -1 -salt [salt] [password] ; to create a hash using the salt new and password 123
+by manually adding entry like new:$1$new$p7ptkEKU1HnaHpRtzNizS1:0:0:root:/root:/bin/bash
+to /etc/passwd, we can create a user called new with uid and gid as root and default shell as /bin/bash. This possible only if /etc/passwd is writeable.
+
+
+EXPLOITING CRON TABS:
+The Cron daemon is a long-running process that executes commands at specific dates and times. You can use this to schedule activities, either as one-time events or as recurring tasks. You can create a crontab file containing commands and instructions for the Cron daemon to execute.
+
+We can use the command "cat /etc/crontab" to view what cron jobs are scheduled.
+
+# = ID
+
+m = Minute
+
+h = Hour
+
+dom = Day of the month
+
+mon = Month
+
+dow = Day of the week
+
+user = What user the command will run as
+
+command = What command should be run
+
+For Example,
+
+#  m   h dom mon dow user  command
+
+17 *   1  *   *   *  root  cd / && run-parts --report /etc/cron.hourly
+
+
+EXPLOITING PATH:
+PATH is an environmental variable in Linux and Unix-like operating systems which specifies directories that hold executable programs. When the user runs any command in the terminal, it searches for executable files with the help of the PATH Variable in response to commands executed by a user.
+
+Now we're inside tmp, let's create an imitation executable. The format for what we want to do is:
+
+echo "[whatever command we want to run]" > [name of the executable we're imitating]
+
+What would the command look like to open a bash shell, writing to a file with the name of the executable we're imitating
+echo "/bin/bash" >  ls
+chmod +x ls
+export PATH=/tmp:$PATH
+
+Now, we need to change the PATH variable, so that it points to the directory where we have our imitation "ls" stored! We do this using the command "export PATH=/tmp:$PATH"
+
+Note, this will cause you to open a bash prompt every time you use "ls". If you need to use "ls" before you finish the exploit, use "/bin/ls" where the real "ls" executable is.
+
+Once you've finished the exploit, you can exit out of root and use "export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:$PATH" to reset the PATH variable back to default, letting you use "ls" again!
+
+Further Reading: 
+https://payatu.com/guide-linux-privilege-escalation
+https://ratiros01.medium.com/tryhackme-common-linux-privesc-b9424aeee36f
+
+
+
